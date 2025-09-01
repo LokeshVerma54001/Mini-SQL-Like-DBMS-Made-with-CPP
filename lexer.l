@@ -5,18 +5,24 @@
 %}
 
 %%
-CREATE                  { return CREATE; }
-TABLE                   { return TABLE; }
-INSERT                  { return INSERT; }
-SELECT                  { return SELECT; }
-FROM                    { return FROM; }
-[0-9]+                  { yylval.ival = atoi(yytext); return NUMBER; }
-[a-zA-Z_][a-zA-Z0-9_]*  { yylval.sval = strdup(yytext); return IDENT; }
+"create"                { return CREATE; }
+"table"                 { return TABLE; }
+"insert"                { return INSERT; }
+"into"                  { return INTO; }
+"values"                { return VALUES; }
+"select"                { return SELECT; }
+"from"                  { return FROM; }
 "*"                     { return STAR; }
 ";"                     { return SEMICOLON; }
-[ \t\n]                 { /* ignore whitespace */ }
-.                       { return *yytext; }
+","                     { return ','; }
+"("                     { return '('; }
+")"                     { return ')'; }
+[0-9]+                  { yylval.sval = strdup(yytext); return NUMBER; }
+[a-zA-Z_][a-zA-Z0-9_]*  { yylval.sval = strdup(yytext); return IDENT; }
+[ \t\n]+                ;   // skip whitespace
+.                       { return yytext[0]; }
 %%
+
 
 int yywrap(void) {
     return 1;

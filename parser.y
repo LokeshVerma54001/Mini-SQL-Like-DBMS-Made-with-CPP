@@ -3,98 +3,143 @@
 #include <stdlib.h>
 #include <string.h>
 
-// forward declare yylex (from lexer.l)
 int yylex();
 void yyerror(const char * s);
 
-/* Define Table Struct here */
+#define MAX_COLS 10
+#define MAX_ROWS 100
+#define MAX_TABLES 10
+
+// Table struct
 typedef struct {
     char* name;
-    int rows[100];
+    char* col_names[MAX_COLS];
+    int col_count;
+    char* rows[MAX_ROWS][MAX_COLS]; // store everything as string
     int row_count;
 } Table;
 
-Table tables[10];
+Table tables[MAX_TABLES];
 int table_count = 0;
+
+// Global column list for CREATE TABLE
+char* col_list[MAX_COLS];
+int col_count = 0;
+
+// Global value list for INSERT
+char* value_list_values[MAX_COLS];
+int value_list_count = 0;
 
 %}
 
-/* Define YYSTYPE */
 %union {
-    int ival;
     char* sval;
-};
+}
 
-/* Declare token types */
-%token <ival> NUMBER
 %token <sval> IDENT
-%token CREATE TABLE INSERT SELECT FROM STAR SEMICOLON
+%token <sval> NUMBER
+%token CREATE TABLE INSERT SELECT FROM STAR SEMICOLON VALUES INTO
+%type <sval> column_list value_list value
 
 %%
 
-commands:
-    /* empty */
-  | commands command
-  ;
+program:
+      program stmt
+    | /* empty */
+;
 
-command:
-      create_stmt SEMICOLON { printf("Parsed CREATE TABLE\n"); }
-    | insert_stmt SEMICOLON { printf("Parsed INSERT\n"); }
-    | select_stmt SEMICOLON { printf("Parsed SELECT\n"); }
-    ;
+stmt:
+      create_stmt SEMICOLON
+    | insert_stmt SEMICOLON
+    | select_stmt SEMICOLON
+;
 
 create_stmt:
-    CREATE TABLE IDENT { 
-        if (table_count >= 10) {
+    CREATE TABLE IDENT '(' column_list ')' {
+        if (table_count >= MAX_TABLES) {
             printf("Error: maximum number of tables reached\n");
         } else {
-            tables[table_count].name = strdup($3);   // copy identifier safely
+            tables[table_count].name = strdup($3);
+            tables[table_count].col_count = col_count;
+            for (int i = 0; i < col_count; i++)
+                tables[table_count].col_names[i] = strdup(col_list[i]);
             tables[table_count].row_count = 0;
-            printf("Table created: %s\n", $3);
+            printf("Created table %s with %d columns\n", $3, col_count);
             table_count++;
         }
     }
-    ;
+;
+
+column_list:
+      IDENT {
+        col_count = 1;
+        col_list[0] = $1;
+      }
+    | column_list ',' IDENT {
+        col_list[col_count++] = $3;
+      }
+;
 
 insert_stmt:
-    INSERT IDENT NUMBER { 
+    INSERT INTO IDENT VALUES value_list {
         int found = 0;
         for (int i = 0; i < table_count; i++) {
-            if (strcmp(tables[i].name, $2) == 0) {
-                if (tables[i].row_count >= 100) {
-                    printf("Error: table %s row limit reached\n", $2);
+            if (strcmp(tables[i].name, $3) == 0) {  // $3 = table name
+                if (tables[i].row_count >= MAX_ROWS) {
+                    printf("Error: table %s row limit reached\n", $3);
+                } else if (value_list_count != tables[i].col_count) {
+                    printf("Error: table %s expects %d columns, got %d\n",
+                           $3, tables[i].col_count, value_list_count);
                 } else {
-                    tables[i].rows[tables[i].row_count++] = $3;
-                    printf("Inserted %d into %s\n", $3, $2);
+                    for (int c = 0; c < value_list_count; c++)
+                        tables[i].rows[tables[i].row_count][c] = strdup(value_list_values[c]);
+                    tables[i].row_count++;
+                    printf("Inserted row into %s\n", $3);
                 }
                 found = 1;
                 break;
             }
         }
-        if (!found) {
-            printf("Error: table %s not found\n", $2);
-        }
+        if (!found)
+            printf("Error: table %s not found\n", $3);
     }
-    ;
+;
+
+value_list:
+      value {
+        value_list_count = 1;
+        value_list_values[0] = $1;
+      }
+    | value_list ',' value {
+        value_list_values[value_list_count++] = $3;
+      }
+;
+
+value:
+      NUMBER { $$ = $1; }
+    | IDENT { $$ = $1; }
+;
 
 select_stmt:
-    SELECT STAR FROM IDENT { 
+    SELECT STAR FROM IDENT {
         int found = 0;
         for (int i = 0; i < table_count; i++) {
             if (strcmp(tables[i].name, $4) == 0) {
-                printf("Table %s:\n", $4);
-                for (int j = 0; j < tables[i].row_count; j++) {
-                    printf("%d\n", tables[i].rows[j]);
+                printf("Rows in table %s:\n", $4);
+                for (int r = 0; r < tables[i].row_count; r++) {
+                    for (int c = 0; c < tables[i].col_count; c++)
+                        
+                        printf("%s\t", tables[i].rows[r][c]);
+                    printf("\n");
                 }
                 found = 1;
                 break;
             }
         }
-        if (!found) {
+        if (!found)
             printf("Error: table %s not found\n", $4);
-        }
     }
-    ;
+;
 
 %%
 

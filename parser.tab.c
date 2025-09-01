@@ -74,24 +74,37 @@
 #include <stdlib.h>
 #include <string.h>
 
-// forward declare yylex (from lexer.l)
 int yylex();
 void yyerror(const char * s);
 
-/* Define Table Struct here */
+#define MAX_COLS 10
+#define MAX_ROWS 100
+#define MAX_TABLES 10
+
+// Table struct
 typedef struct {
     char* name;
-    int rows[100];
+    char* col_names[MAX_COLS];
+    int col_count;
+    char* rows[MAX_ROWS][MAX_COLS]; // store everything as string
     int row_count;
 } Table;
 
-Table tables[10];
+Table tables[MAX_TABLES];
 int table_count = 0;
+
+// Global column list for CREATE TABLE
+char* col_list[MAX_COLS];
+int col_count = 0;
+
+// Global value list for INSERT
+char* value_list_values[MAX_COLS];
+int value_list_count = 0;
 
 
 
 /* Line 189 of yacc.c  */
-#line 95 "parser.tab.c"
+#line 108 "parser.tab.c"
 
 /* Enabling traces.  */
 #ifndef YYDEBUG
@@ -118,15 +131,17 @@ int table_count = 0;
    /* Put the tokens into the symbol table, so that GDB and other debuggers
       know about them.  */
    enum yytokentype {
-     NUMBER = 258,
-     IDENT = 259,
+     IDENT = 258,
+     NUMBER = 259,
      CREATE = 260,
      TABLE = 261,
      INSERT = 262,
      SELECT = 263,
      FROM = 264,
      STAR = 265,
-     SEMICOLON = 266
+     SEMICOLON = 266,
+     VALUES = 267,
+     INTO = 268
    };
 #endif
 
@@ -137,15 +152,14 @@ typedef union YYSTYPE
 {
 
 /* Line 214 of yacc.c  */
-#line 23 "parser.y"
+#line 35 "parser.y"
 
-    int ival;
     char* sval;
 
 
 
 /* Line 214 of yacc.c  */
-#line 149 "parser.tab.c"
+#line 163 "parser.tab.c"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
@@ -157,7 +171,7 @@ typedef union YYSTYPE
 
 
 /* Line 264 of yacc.c  */
-#line 161 "parser.tab.c"
+#line 175 "parser.tab.c"
 
 #ifdef short
 # undef short
@@ -372,20 +386,20 @@ union yyalloc
 /* YYFINAL -- State number of the termination state.  */
 #define YYFINAL  2
 /* YYLAST -- Last index in YYTABLE.  */
-#define YYLAST   15
+#define YYLAST   24
 
 /* YYNTOKENS -- Number of terminals.  */
-#define YYNTOKENS  12
+#define YYNTOKENS  17
 /* YYNNTS -- Number of nonterminals.  */
-#define YYNNTS  6
+#define YYNNTS  9
 /* YYNRULES -- Number of rules.  */
-#define YYNRULES  9
+#define YYNRULES  15
 /* YYNRULES -- Number of states.  */
-#define YYNSTATES  20
+#define YYNSTATES  33
 
 /* YYTRANSLATE(YYLEX) -- Bison symbol number corresponding to YYLEX.  */
 #define YYUNDEFTOK  2
-#define YYMAXUTOK   266
+#define YYMAXUTOK   268
 
 #define YYTRANSLATE(YYX)						\
   ((unsigned int) (YYX) <= YYMAXUTOK ? yytranslate[YYX] : YYUNDEFTOK)
@@ -397,7 +411,7 @@ static const yytype_uint8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-       2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+      14,    15,     2,     2,    16,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -419,7 +433,7 @@ static const yytype_uint8 yytranslate[] =
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
        2,     2,     2,     2,     2,     2,     1,     2,     3,     4,
-       5,     6,     7,     8,     9,    10,    11
+       5,     6,     7,     8,     9,    10,    11,    12,    13
 };
 
 #if YYDEBUG
@@ -427,21 +441,25 @@ static const yytype_uint8 yytranslate[] =
    YYRHS.  */
 static const yytype_uint8 yyprhs[] =
 {
-       0,     0,     3,     4,     7,    10,    13,    16,    20,    24
+       0,     0,     3,     6,     7,    10,    13,    16,    23,    25,
+      29,    35,    37,    41,    43,    45
 };
 
 /* YYRHS -- A `-1'-separated list of the rules' RHS.  */
 static const yytype_int8 yyrhs[] =
 {
-      13,     0,    -1,    -1,    13,    14,    -1,    15,    11,    -1,
-      16,    11,    -1,    17,    11,    -1,     5,     6,     4,    -1,
-       7,     4,     3,    -1,     8,    10,     9,     4,    -1
+      18,     0,    -1,    18,    19,    -1,    -1,    20,    11,    -1,
+      22,    11,    -1,    25,    11,    -1,     5,     6,     3,    14,
+      21,    15,    -1,     3,    -1,    21,    16,     3,    -1,     7,
+      13,     3,    12,    23,    -1,    24,    -1,    23,    16,    24,
+      -1,     4,    -1,     3,    -1,     8,    10,     9,     3,    -1
 };
 
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint8 yyrline[] =
 {
-       0,    35,    35,    37,    41,    42,    43,    47,    60,    81
+       0,    47,    47,    48,    52,    53,    54,    58,    74,    78,
+      84,   109,   113,   119,   120,   124
 };
 #endif
 
@@ -450,9 +468,10 @@ static const yytype_uint8 yyrline[] =
    First, the terminals, then, starting at YYNTOKENS, nonterminals.  */
 static const char *const yytname[] =
 {
-  "$end", "error", "$undefined", "NUMBER", "IDENT", "CREATE", "TABLE",
-  "INSERT", "SELECT", "FROM", "STAR", "SEMICOLON", "$accept", "commands",
-  "command", "create_stmt", "insert_stmt", "select_stmt", 0
+  "$end", "error", "$undefined", "IDENT", "NUMBER", "CREATE", "TABLE",
+  "INSERT", "SELECT", "FROM", "STAR", "SEMICOLON", "VALUES", "INTO", "'('",
+  "')'", "','", "$accept", "program", "stmt", "create_stmt", "column_list",
+  "insert_stmt", "value_list", "value", "select_stmt", 0
 };
 #endif
 
@@ -462,20 +481,22 @@ static const char *const yytname[] =
 static const yytype_uint16 yytoknum[] =
 {
        0,   256,   257,   258,   259,   260,   261,   262,   263,   264,
-     265,   266
+     265,   266,   267,   268,    40,    41,    44
 };
 # endif
 
 /* YYR1[YYN] -- Symbol number of symbol that rule YYN derives.  */
 static const yytype_uint8 yyr1[] =
 {
-       0,    12,    13,    13,    14,    14,    14,    15,    16,    17
+       0,    17,    18,    18,    19,    19,    19,    20,    21,    21,
+      22,    23,    23,    24,    24,    25
 };
 
 /* YYR2[YYN] -- Number of symbols composing right hand side of rule YYN.  */
 static const yytype_uint8 yyr2[] =
 {
-       0,     2,     0,     2,     2,     2,     2,     3,     3,     4
+       0,     2,     2,     0,     2,     2,     2,     6,     1,     3,
+       5,     1,     3,     1,     1,     4
 };
 
 /* YYDEFACT[STATE-NAME] -- Default rule to reduce with in state
@@ -483,29 +504,33 @@ static const yytype_uint8 yyr2[] =
    means the default is an error.  */
 static const yytype_uint8 yydefact[] =
 {
-       2,     0,     1,     0,     0,     0,     3,     0,     0,     0,
-       0,     0,     0,     4,     5,     6,     7,     8,     0,     9
+       3,     0,     1,     0,     0,     0,     2,     0,     0,     0,
+       0,     0,     0,     4,     5,     6,     0,     0,     0,     0,
+       0,    15,     8,     0,    14,    13,    10,    11,     7,     0,
+       0,     9,    12
 };
 
 /* YYDEFGOTO[NTERM-NUM].  */
 static const yytype_int8 yydefgoto[] =
 {
-      -1,     1,     6,     7,     8,     9
+      -1,     1,     6,     7,    23,     8,    26,    27,     9
 };
 
 /* YYPACT[STATE-NUM] -- Index in YYTABLE of the portion describing
    STATE-NUM.  */
-#define YYPACT_NINF -8
+#define YYPACT_NINF -13
 static const yytype_int8 yypact[] =
 {
-      -8,     0,    -8,    -5,    -2,    -7,    -8,    -1,     1,     2,
-       5,     3,     6,    -8,    -8,    -8,    -8,    -8,     7,    -8
+     -13,     0,   -13,     3,    -7,     1,   -13,    -1,     2,     4,
+       9,    11,     7,   -13,   -13,   -13,     5,     6,    14,    17,
+      -2,   -13,   -13,   -12,   -13,   -13,     8,   -13,   -13,    18,
+      -2,   -13,   -13
 };
 
 /* YYPGOTO[NTERM-NUM].  */
 static const yytype_int8 yypgoto[] =
 {
-      -8,    -8,    -8,    -8,    -8,    -8
+     -13,   -13,   -13,   -13,   -13,   -13,   -13,    -8,   -13
 };
 
 /* YYTABLE[YYPACT[STATE-NUM]].  What to do in state STATE-NUM.  If
@@ -515,22 +540,26 @@ static const yytype_int8 yypgoto[] =
 #define YYTABLE_NINF -1
 static const yytype_uint8 yytable[] =
 {
-       2,    10,    11,    12,     0,     3,    17,     4,     5,    16,
-      13,    19,    14,    15,     0,    18
+       2,    24,    25,    28,    29,     3,    11,     4,     5,    10,
+      13,    12,    16,    14,    17,    15,    18,    21,    20,    19,
+      22,    31,    32,     0,    30
 };
 
 static const yytype_int8 yycheck[] =
 {
-       0,     6,     4,    10,    -1,     5,     3,     7,     8,     4,
-      11,     4,    11,    11,    -1,     9
+       0,     3,     4,    15,    16,     5,    13,     7,     8,     6,
+      11,    10,     3,    11,     3,    11,     9,     3,    12,    14,
+       3,     3,    30,    -1,    16
 };
 
 /* YYSTOS[STATE-NUM] -- The (internal number of the) accessing
    symbol of state STATE-NUM.  */
 static const yytype_uint8 yystos[] =
 {
-       0,    13,     0,     5,     7,     8,    14,    15,    16,    17,
-       6,     4,    10,    11,    11,    11,     4,     3,     9,     4
+       0,    18,     0,     5,     7,     8,    19,    20,    22,    25,
+       6,    13,    10,    11,    11,    11,     3,     3,     9,    14,
+      12,     3,     3,    21,     3,     4,    23,    24,    15,    16,
+      16,     3,    24
 };
 
 #define yyerrok		(yyerrstatus = 0)
@@ -1341,38 +1370,20 @@ yyreduce:
   YY_REDUCE_PRINT (yyn);
   switch (yyn)
     {
-        case 4:
+        case 7:
 
 /* Line 1455 of yacc.c  */
-#line 41 "parser.y"
-    { printf("Parsed CREATE TABLE\n"); ;}
-    break;
-
-  case 5:
-
-/* Line 1455 of yacc.c  */
-#line 42 "parser.y"
-    { printf("Parsed INSERT\n"); ;}
-    break;
-
-  case 6:
-
-/* Line 1455 of yacc.c  */
-#line 43 "parser.y"
-    { printf("Parsed SELECT\n"); ;}
-    break;
-
-  case 7:
-
-/* Line 1455 of yacc.c  */
-#line 47 "parser.y"
-    { 
-        if (table_count >= 10) {
+#line 58 "parser.y"
+    {
+        if (table_count >= MAX_TABLES) {
             printf("Error: maximum number of tables reached\n");
         } else {
-            tables[table_count].name = strdup((yyvsp[(3) - (3)].sval));   // copy identifier safely
+            tables[table_count].name = strdup((yyvsp[(3) - (6)].sval));
+            tables[table_count].col_count = col_count;
+            for (int i = 0; i < col_count; i++)
+                tables[table_count].col_names[i] = strdup(col_list[i]);
             tables[table_count].row_count = 0;
-            printf("Table created: %s\n", (yyvsp[(3) - (3)].sval));
+            printf("Created table %s with %d columns\n", (yyvsp[(3) - (6)].sval), col_count);
             table_count++;
         }
     ;}
@@ -1381,53 +1392,110 @@ yyreduce:
   case 8:
 
 /* Line 1455 of yacc.c  */
-#line 60 "parser.y"
-    { 
-        int found = 0;
-        for (int i = 0; i < table_count; i++) {
-            if (strcmp(tables[i].name, (yyvsp[(2) - (3)].sval)) == 0) {
-                if (tables[i].row_count >= 100) {
-                    printf("Error: table %s row limit reached\n", (yyvsp[(2) - (3)].sval));
-                } else {
-                    tables[i].rows[tables[i].row_count++] = (yyvsp[(3) - (3)].ival);
-                    printf("Inserted %d into %s\n", (yyvsp[(3) - (3)].ival), (yyvsp[(2) - (3)].sval));
-                }
-                found = 1;
-                break;
-            }
-        }
-        if (!found) {
-            printf("Error: table %s not found\n", (yyvsp[(2) - (3)].sval));
-        }
-    ;}
+#line 74 "parser.y"
+    {
+        col_count = 1;
+        col_list[0] = (yyvsp[(1) - (1)].sval);
+      ;}
     break;
 
   case 9:
 
 /* Line 1455 of yacc.c  */
-#line 81 "parser.y"
-    { 
+#line 78 "parser.y"
+    {
+        col_list[col_count++] = (yyvsp[(3) - (3)].sval);
+      ;}
+    break;
+
+  case 10:
+
+/* Line 1455 of yacc.c  */
+#line 84 "parser.y"
+    {
         int found = 0;
         for (int i = 0; i < table_count; i++) {
-            if (strcmp(tables[i].name, (yyvsp[(4) - (4)].sval)) == 0) {
-                printf("Table %s:\n", (yyvsp[(4) - (4)].sval));
-                for (int j = 0; j < tables[i].row_count; j++) {
-                    printf("%d\n", tables[i].rows[j]);
+            if (strcmp(tables[i].name, (yyvsp[(3) - (5)].sval)) == 0) {  // $3 = table name
+                if (tables[i].row_count >= MAX_ROWS) {
+                    printf("Error: table %s row limit reached\n", (yyvsp[(3) - (5)].sval));
+                } else if (value_list_count != tables[i].col_count) {
+                    printf("Error: table %s expects %d columns, got %d\n",
+                           (yyvsp[(3) - (5)].sval), tables[i].col_count, value_list_count);
+                } else {
+                    for (int c = 0; c < value_list_count; c++)
+                        tables[i].rows[tables[i].row_count][c] = strdup(value_list_values[c]);
+                    tables[i].row_count++;
+                    printf("Inserted row into %s\n", (yyvsp[(3) - (5)].sval));
                 }
                 found = 1;
                 break;
             }
         }
-        if (!found) {
-            printf("Error: table %s not found\n", (yyvsp[(4) - (4)].sval));
+        if (!found)
+            printf("Error: table %s not found\n", (yyvsp[(3) - (5)].sval));
+    ;}
+    break;
+
+  case 11:
+
+/* Line 1455 of yacc.c  */
+#line 109 "parser.y"
+    {
+        value_list_count = 1;
+        value_list_values[0] = (yyvsp[(1) - (1)].sval);
+      ;}
+    break;
+
+  case 12:
+
+/* Line 1455 of yacc.c  */
+#line 113 "parser.y"
+    {
+        value_list_values[value_list_count++] = (yyvsp[(3) - (3)].sval);
+      ;}
+    break;
+
+  case 13:
+
+/* Line 1455 of yacc.c  */
+#line 119 "parser.y"
+    { (yyval.sval) = (yyvsp[(1) - (1)].sval); ;}
+    break;
+
+  case 14:
+
+/* Line 1455 of yacc.c  */
+#line 120 "parser.y"
+    { (yyval.sval) = (yyvsp[(1) - (1)].sval); ;}
+    break;
+
+  case 15:
+
+/* Line 1455 of yacc.c  */
+#line 124 "parser.y"
+    {
+        int found = 0;
+        for (int i = 0; i < table_count; i++) {
+            if (strcmp(tables[i].name, (yyvsp[(4) - (4)].sval)) == 0) {
+                printf("Rows in table %s:\n", (yyvsp[(4) - (4)].sval));
+                for (int r = 0; r < tables[i].row_count; r++) {
+                    for (int c = 0; c < tables[i].col_count; c++)
+                        printf("%s ", tables[i].rows[r][c]);
+                    printf("\n");
+                }
+                found = 1;
+                break;
+            }
         }
+        if (!found)
+            printf("Error: table %s not found\n", (yyvsp[(4) - (4)].sval));
     ;}
     break;
 
 
 
 /* Line 1455 of yacc.c  */
-#line 1431 "parser.tab.c"
+#line 1499 "parser.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -1639,7 +1707,7 @@ yyreturn:
 
 
 /* Line 1675 of yacc.c  */
-#line 99 "parser.y"
+#line 143 "parser.y"
 
 
 void yyerror(const char *s) {
