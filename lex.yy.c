@@ -386,7 +386,7 @@ char *yytext;
 #line 2 "lexer.l"
 #include "parser.tab.h"
 #include <string.h>
-#define strdup _strdup
+#define strdup _strdup  // only if compiling on Windows
 #line 391 "lex.yy.c"
 
 /* Macros after this point can all be overridden by user definitions in
@@ -626,57 +626,57 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 YY_RULE_SETUP
 #line 8 "lexer.l"
-{return CREATE;}
+{ return CREATE; }
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
 #line 9 "lexer.l"
-{return TABLE;}
+{ return TABLE; }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
 #line 10 "lexer.l"
-{return INSERT;}
+{ return INSERT; }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
 #line 11 "lexer.l"
-{return SELECT;}
+{ return SELECT; }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
 #line 12 "lexer.l"
-{return FROM;}
+{ return FROM; }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
 #line 13 "lexer.l"
-{yylval = atoi(yytext); return NUMBER;}
+{ yylval.ival = atoi(yytext); return NUMBER; }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
 #line 14 "lexer.l"
-{yylval = _strdup(yytext); return IDENT;}
+{ yylval.sval = strdup(yytext); return IDENT; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
 #line 15 "lexer.l"
-{return STAR;}
+{ return STAR; }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
 #line 16 "lexer.l"
-{return SEMICOLON;}
+{ return SEMICOLON; }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
 #line 17 "lexer.l"
-// ignore spaces
+{ /* ignore whitespace */ }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
 #line 18 "lexer.l"
-{return *yytext;} 
+{ return *yytext; }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
@@ -1572,3 +1572,6 @@ int main()
 #line 19 "lexer.l"
 
 
+int yywrap(void) {
+    return 1;
+}
