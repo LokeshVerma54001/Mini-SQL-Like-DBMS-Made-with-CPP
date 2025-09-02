@@ -73,38 +73,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "globals.h"
 
-int yylex();
+extern int yylex();
 void yyerror(const char * s);
-
-#define MAX_COLS 10
-#define MAX_ROWS 100
-#define MAX_TABLES 10
-
-// Table struct
-typedef struct {
-    char* name;
-    char* col_names[MAX_COLS];
-    int col_count;
-    char* rows[MAX_ROWS][MAX_COLS]; // store everything as string
-    int row_count;
-} Table;
-
-Table tables[MAX_TABLES];
-int table_count = 0;
-
-// Global column list for CREATE TABLE
-char* col_list[MAX_COLS];
-int col_count = 0;
-
-// Global value list for INSERT
-char* value_list_values[MAX_COLS];
-int value_list_count = 0;
-
 
 
 /* Line 189 of yacc.c  */
-#line 108 "parser.tab.c"
+#line 84 "parser.tab.c"
 
 /* Enabling traces.  */
 #ifndef YYDEBUG
@@ -152,14 +128,14 @@ typedef union YYSTYPE
 {
 
 /* Line 214 of yacc.c  */
-#line 35 "parser.y"
+#line 11 "parser.y"
 
     char* sval;
 
 
 
 /* Line 214 of yacc.c  */
-#line 163 "parser.tab.c"
+#line 139 "parser.tab.c"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
@@ -171,7 +147,7 @@ typedef union YYSTYPE
 
 
 /* Line 264 of yacc.c  */
-#line 175 "parser.tab.c"
+#line 151 "parser.tab.c"
 
 #ifdef short
 # undef short
@@ -458,8 +434,8 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint8 yyrline[] =
 {
-       0,    47,    47,    48,    52,    53,    54,    58,    74,    78,
-      84,   109,   113,   119,   120,   124
+       0,    23,    23,    24,    28,    29,    30,    35,    61,    66,
+      79,   111,   116,   129,   130,   135
 };
 #endif
 
@@ -1373,45 +1349,61 @@ yyreduce:
         case 7:
 
 /* Line 1455 of yacc.c  */
-#line 58 "parser.y"
+#line 35 "parser.y"
     {
         if (table_count >= MAX_TABLES) {
             printf("Error: maximum number of tables reached\n");
         } else {
-            tables[table_count].name = strdup((yyvsp[(3) - (6)].sval));
+            // table name
+            strncpy(tables[table_count].name, (yyvsp[(3) - (6)].sval), MAX_NAME_LEN - 1);
+            tables[table_count].name[MAX_NAME_LEN - 1] = '\0';
+
+            // columns
             tables[table_count].col_count = col_count;
-            for (int i = 0; i < col_count; i++)
-                tables[table_count].col_names[i] = strdup(col_list[i]);
+            for (int i = 0; i < col_count; i++) {
+                strncpy(tables[table_count].columns[i], col_list[i], MAX_NAME_LEN - 1);
+                tables[table_count].columns[i][MAX_NAME_LEN - 1] = '\0';
+            }
+
             tables[table_count].row_count = 0;
-            printf("Created table %s with %d columns\n", (yyvsp[(3) - (6)].sval), col_count);
+            printf("Created table %s with %d columns\n", tables[table_count].name, col_count);
             table_count++;
         }
+        // reset temp state
+        col_count = 0;
     ;}
     break;
 
   case 8:
 
 /* Line 1455 of yacc.c  */
-#line 74 "parser.y"
+#line 61 "parser.y"
     {
         col_count = 1;
-        col_list[0] = (yyvsp[(1) - (1)].sval);
+        strncpy(col_list[0], (yyvsp[(1) - (1)].sval), MAX_NAME_LEN - 1);
+        col_list[0][MAX_NAME_LEN - 1] = '\0';
       ;}
     break;
 
   case 9:
 
 /* Line 1455 of yacc.c  */
-#line 78 "parser.y"
+#line 66 "parser.y"
     {
-        col_list[col_count++] = (yyvsp[(3) - (3)].sval);
+        if (col_count < MAX_COLS) {
+            strncpy(col_list[col_count], (yyvsp[(3) - (3)].sval), MAX_NAME_LEN - 1);
+            col_list[col_count][MAX_NAME_LEN - 1] = '\0';
+            col_count++;
+        } else {
+            printf("Warning: too many columns (max %d); ignoring '%s'\n", MAX_COLS, (yyvsp[(3) - (3)].sval));
+        }
       ;}
     break;
 
   case 10:
 
 /* Line 1455 of yacc.c  */
-#line 84 "parser.y"
+#line 79 "parser.y"
     {
         int found = 0;
         for (int i = 0; i < table_count; i++) {
@@ -1422,8 +1414,11 @@ yyreduce:
                     printf("Error: table %s expects %d columns, got %d\n",
                            (yyvsp[(3) - (5)].sval), tables[i].col_count, value_list_count);
                 } else {
-                    for (int c = 0; c < value_list_count; c++)
-                        tables[i].rows[tables[i].row_count][c] = strdup(value_list_values[c]);
+                    for (int c = 0; c < value_list_count; c++) {
+                        strncpy(tables[i].rows[tables[i].row_count][c],
+                                value_list_values[c], MAX_VALUE_LEN - 1);
+                        tables[i].rows[tables[i].row_count][c][MAX_VALUE_LEN - 1] = '\0';
+                    }
                     tables[i].row_count++;
                     printf("Inserted row into %s\n", (yyvsp[(3) - (5)].sval));
                 }
@@ -1433,54 +1428,72 @@ yyreduce:
         }
         if (!found)
             printf("Error: table %s not found\n", (yyvsp[(3) - (5)].sval));
+
+        // reset temp state
+        value_list_count = 0;
     ;}
     break;
 
   case 11:
 
 /* Line 1455 of yacc.c  */
-#line 109 "parser.y"
+#line 111 "parser.y"
     {
         value_list_count = 1;
-        value_list_values[0] = (yyvsp[(1) - (1)].sval);
+        strncpy(value_list_values[0], (yyvsp[(1) - (1)].sval), MAX_VALUE_LEN - 1);
+        value_list_values[0][MAX_VALUE_LEN - 1] = '\0';
       ;}
     break;
 
   case 12:
 
 /* Line 1455 of yacc.c  */
-#line 113 "parser.y"
+#line 116 "parser.y"
     {
-        value_list_values[value_list_count++] = (yyvsp[(3) - (3)].sval);
+        if (value_list_count < MAX_COLS) {
+            strncpy(value_list_values[value_list_count], (yyvsp[(3) - (3)].sval), MAX_VALUE_LEN - 1);
+            value_list_values[value_list_count][MAX_VALUE_LEN - 1] = '\0';
+            value_list_count++;
+        } else {
+            printf("Warning: too many values (max %d); ignoring '%s'\n", MAX_COLS, (yyvsp[(3) - (3)].sval));
+        }
       ;}
     break;
 
   case 13:
 
 /* Line 1455 of yacc.c  */
-#line 119 "parser.y"
+#line 129 "parser.y"
     { (yyval.sval) = (yyvsp[(1) - (1)].sval); ;}
     break;
 
   case 14:
 
 /* Line 1455 of yacc.c  */
-#line 120 "parser.y"
+#line 130 "parser.y"
     { (yyval.sval) = (yyvsp[(1) - (1)].sval); ;}
     break;
 
   case 15:
 
 /* Line 1455 of yacc.c  */
-#line 124 "parser.y"
+#line 135 "parser.y"
     {
         int found = 0;
         for (int i = 0; i < table_count; i++) {
             if (strcmp(tables[i].name, (yyvsp[(4) - (4)].sval)) == 0) {
                 printf("Rows in table %s:\n", (yyvsp[(4) - (4)].sval));
+
+                // Column headers
+                for (int c = 0; c < tables[i].col_count; c++) {
+                    printf("%s\t", tables[i].columns[c]);
+                }
+                printf("\n");
+
+                // Rows
                 for (int r = 0; r < tables[i].row_count; r++) {
                     for (int c = 0; c < tables[i].col_count; c++)
-                        printf("%s ", tables[i].rows[r][c]);
+                        printf("%s\t", tables[i].rows[r][c]);
                     printf("\n");
                 }
                 found = 1;
@@ -1495,7 +1508,7 @@ yyreduce:
 
 
 /* Line 1455 of yacc.c  */
-#line 1499 "parser.tab.c"
+#line 1512 "parser.tab.c"
       default: break;
     }
   YY_SYMBOL_PRINT ("-> $$ =", yyr1[yyn], &yyval, &yyloc);
@@ -1707,7 +1720,7 @@ yyreturn:
 
 
 /* Line 1675 of yacc.c  */
-#line 143 "parser.y"
+#line 162 "parser.y"
 
 
 void yyerror(const char *s) {

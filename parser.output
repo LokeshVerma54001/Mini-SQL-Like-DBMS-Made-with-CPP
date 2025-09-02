@@ -11,12 +11,18 @@ Grammar
 
     6 create_stmt: CREATE TABLE IDENT '(' column_list ')'
 
-    7 insert_stmt: INSERT IDENT NUMBER
+    7 column_list: IDENT
+    8            | column_list ',' IDENT
 
-    8 select_stmt: SELECT STAR FROM IDENT
+    9 insert_stmt: INSERT INTO IDENT VALUES value_list
 
-    9 column_list: IDENT
-   10            | column_list ',' IDENT
+   10 value_list: value
+   11           | value_list ',' value
+
+   12 value: NUMBER
+   13      | IDENT
+
+   14 select_stmt: SELECT STAR FROM IDENT
 
 
 Terminals, with rules where they appear
@@ -24,35 +30,41 @@ Terminals, with rules where they appear
 $end (0) 0
 '(' (40) 6
 ')' (41) 6
-',' (44) 10
+',' (44) 8 11
 error (256)
-NUMBER (258) 7
-IDENT (259) 6 7 8 9 10
+IDENT (258) 6 7 8 9 13 14
+NUMBER (259) 12
 CREATE (260) 6
 TABLE (261) 6
-INSERT (262) 7
-SELECT (263) 8
-FROM (264) 8
-STAR (265) 8
+INSERT (262) 9
+SELECT (263) 14
+FROM (264) 14
+STAR (265) 14
 SEMICOLON (266) 3 4 5
+VALUES (267) 9
+INTO (268) 9
 
 
 Nonterminals, with rules where they appear
 
-$accept (15)
+$accept (17)
     on left: 0
-program (16)
+program (18)
     on left: 1 2, on right: 0 1
-stmt (17)
+stmt (19)
     on left: 3 4 5, on right: 1
-create_stmt (18)
+create_stmt (20)
     on left: 6, on right: 3
-insert_stmt (19)
-    on left: 7, on right: 4
-select_stmt (20)
-    on left: 8, on right: 5
 column_list (21)
-    on left: 9 10, on right: 6 10
+    on left: 7 8, on right: 6 8
+insert_stmt (22)
+    on left: 9, on right: 4
+value_list (23)
+    on left: 10 11, on right: 9 11
+value (24)
+    on left: 12 13, on right: 10 11
+select_stmt (25)
+    on left: 14, on right: 5
 
 
 state 0
@@ -96,14 +108,14 @@ state 3
 
 state 4
 
-    7 insert_stmt: INSERT . IDENT NUMBER
+    9 insert_stmt: INSERT . INTO IDENT VALUES value_list
 
-    IDENT  shift, and go to state 11
+    INTO  shift, and go to state 11
 
 
 state 5
 
-    8 select_stmt: SELECT . STAR FROM IDENT
+   14 select_stmt: SELECT . STAR FROM IDENT
 
     STAR  shift, and go to state 12
 
@@ -145,14 +157,14 @@ state 10
 
 state 11
 
-    7 insert_stmt: INSERT IDENT . NUMBER
+    9 insert_stmt: INSERT INTO . IDENT VALUES value_list
 
-    NUMBER  shift, and go to state 17
+    IDENT  shift, and go to state 17
 
 
 state 12
 
-    8 select_stmt: SELECT STAR . FROM IDENT
+   14 select_stmt: SELECT STAR . FROM IDENT
 
     FROM  shift, and go to state 18
 
@@ -187,66 +199,125 @@ state 16
 
 state 17
 
-    7 insert_stmt: INSERT IDENT NUMBER .
+    9 insert_stmt: INSERT INTO IDENT . VALUES value_list
 
-    $default  reduce using rule 7 (insert_stmt)
+    VALUES  shift, and go to state 20
 
 
 state 18
 
-    8 select_stmt: SELECT STAR FROM . IDENT
+   14 select_stmt: SELECT STAR FROM . IDENT
 
-    IDENT  shift, and go to state 20
+    IDENT  shift, and go to state 21
 
 
 state 19
 
     6 create_stmt: CREATE TABLE IDENT '(' . column_list ')'
 
-    IDENT  shift, and go to state 21
+    IDENT  shift, and go to state 22
 
-    column_list  go to state 22
+    column_list  go to state 23
 
 
 state 20
 
-    8 select_stmt: SELECT STAR FROM IDENT .
+    9 insert_stmt: INSERT INTO IDENT VALUES . value_list
 
-    $default  reduce using rule 8 (select_stmt)
+    IDENT   shift, and go to state 24
+    NUMBER  shift, and go to state 25
+
+    value_list  go to state 26
+    value       go to state 27
 
 
 state 21
 
-    9 column_list: IDENT .
+   14 select_stmt: SELECT STAR FROM IDENT .
 
-    $default  reduce using rule 9 (column_list)
+    $default  reduce using rule 14 (select_stmt)
 
 
 state 22
 
-    6 create_stmt: CREATE TABLE IDENT '(' column_list . ')'
-   10 column_list: column_list . ',' IDENT
+    7 column_list: IDENT .
 
-    ')'  shift, and go to state 23
-    ','  shift, and go to state 24
+    $default  reduce using rule 7 (column_list)
 
 
 state 23
+
+    6 create_stmt: CREATE TABLE IDENT '(' column_list . ')'
+    8 column_list: column_list . ',' IDENT
+
+    ')'  shift, and go to state 28
+    ','  shift, and go to state 29
+
+
+state 24
+
+   13 value: IDENT .
+
+    $default  reduce using rule 13 (value)
+
+
+state 25
+
+   12 value: NUMBER .
+
+    $default  reduce using rule 12 (value)
+
+
+state 26
+
+    9 insert_stmt: INSERT INTO IDENT VALUES value_list .
+   11 value_list: value_list . ',' value
+
+    ','  shift, and go to state 30
+
+    $default  reduce using rule 9 (insert_stmt)
+
+
+state 27
+
+   10 value_list: value .
+
+    $default  reduce using rule 10 (value_list)
+
+
+state 28
 
     6 create_stmt: CREATE TABLE IDENT '(' column_list ')' .
 
     $default  reduce using rule 6 (create_stmt)
 
 
-state 24
+state 29
 
-   10 column_list: column_list ',' . IDENT
+    8 column_list: column_list ',' . IDENT
 
-    IDENT  shift, and go to state 25
+    IDENT  shift, and go to state 31
 
 
-state 25
+state 30
 
-   10 column_list: column_list ',' IDENT .
+   11 value_list: value_list ',' . value
 
-    $default  reduce using rule 10 (column_list)
+    IDENT   shift, and go to state 24
+    NUMBER  shift, and go to state 25
+
+    value  go to state 32
+
+
+state 31
+
+    8 column_list: column_list ',' IDENT .
+
+    $default  reduce using rule 8 (column_list)
+
+
+state 32
+
+   11 value_list: value_list ',' value .
+
+    $default  reduce using rule 11 (value_list)

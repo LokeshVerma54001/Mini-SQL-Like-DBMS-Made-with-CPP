@@ -2,34 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "globals.h"
 
-int yylex();
+extern int yylex();
 void yyerror(const char * s);
-
-#define MAX_COLS 10
-#define MAX_ROWS 100
-#define MAX_TABLES 10
-
-// Table struct
-typedef struct {
-    char* name;
-    char* col_names[MAX_COLS];
-    int col_count;
-    char* rows[MAX_ROWS][MAX_COLS]; // store everything as string
-    int row_count;
-} Table;
-
-Table tables[MAX_TABLES];
-int table_count = 0;
-
-// Global column list for CREATE TABLE
-char* col_list[MAX_COLS];
-int col_count = 0;
-
-// Global value list for INSERT
-char* value_list_values[MAX_COLS];
-int value_list_count = 0;
-
 %}
 
 %union {
@@ -54,32 +30,51 @@ stmt:
     | select_stmt SEMICOLON
 ;
 
+/* ---------------- CREATE TABLE ---------------- */
 create_stmt:
     CREATE TABLE IDENT '(' column_list ')' {
         if (table_count >= MAX_TABLES) {
             printf("Error: maximum number of tables reached\n");
         } else {
-            tables[table_count].name = strdup($3);
+            // table name
+            strncpy(tables[table_count].name, $3, MAX_NAME_LEN - 1);
+            tables[table_count].name[MAX_NAME_LEN - 1] = '\0';
+
+            // columns
             tables[table_count].col_count = col_count;
-            for (int i = 0; i < col_count; i++)
-                tables[table_count].col_names[i] = strdup(col_list[i]);
+            for (int i = 0; i < col_count; i++) {
+                strncpy(tables[table_count].columns[i], col_list[i], MAX_NAME_LEN - 1);
+                tables[table_count].columns[i][MAX_NAME_LEN - 1] = '\0';
+            }
+
             tables[table_count].row_count = 0;
-            printf("Created table %s with %d columns\n", $3, col_count);
+            printf("Created table %s with %d columns\n", tables[table_count].name, col_count);
             table_count++;
         }
+        // reset temp state
+        col_count = 0;
     }
 ;
 
+/* Build the temporary column list into col_list/col_count */
 column_list:
       IDENT {
         col_count = 1;
-        col_list[0] = $1;
+        strncpy(col_list[0], $1, MAX_NAME_LEN - 1);
+        col_list[0][MAX_NAME_LEN - 1] = '\0';
       }
     | column_list ',' IDENT {
-        col_list[col_count++] = $3;
+        if (col_count < MAX_COLS) {
+            strncpy(col_list[col_count], $3, MAX_NAME_LEN - 1);
+            col_list[col_count][MAX_NAME_LEN - 1] = '\0';
+            col_count++;
+        } else {
+            printf("Warning: too many columns (max %d); ignoring '%s'\n", MAX_COLS, $3);
+        }
       }
 ;
 
+/* ---------------- INSERT INTO ... VALUES ... ---------------- */
 insert_stmt:
     INSERT INTO IDENT VALUES value_list {
         int found = 0;
@@ -91,8 +86,11 @@ insert_stmt:
                     printf("Error: table %s expects %d columns, got %d\n",
                            $3, tables[i].col_count, value_list_count);
                 } else {
-                    for (int c = 0; c < value_list_count; c++)
-                        tables[i].rows[tables[i].row_count][c] = strdup(value_list_values[c]);
+                    for (int c = 0; c < value_list_count; c++) {
+                        strncpy(tables[i].rows[tables[i].row_count][c],
+                                value_list_values[c], MAX_VALUE_LEN - 1);
+                        tables[i].rows[tables[i].row_count][c][MAX_VALUE_LEN - 1] = '\0';
+                    }
                     tables[i].row_count++;
                     printf("Inserted row into %s\n", $3);
                 }
@@ -102,33 +100,53 @@ insert_stmt:
         }
         if (!found)
             printf("Error: table %s not found\n", $3);
+
+        // reset temp state
+        value_list_count = 0;
     }
 ;
 
+/* Fill temp value_list_values/value_list_count */
 value_list:
       value {
         value_list_count = 1;
-        value_list_values[0] = $1;
+        strncpy(value_list_values[0], $1, MAX_VALUE_LEN - 1);
+        value_list_values[0][MAX_VALUE_LEN - 1] = '\0';
       }
     | value_list ',' value {
-        value_list_values[value_list_count++] = $3;
+        if (value_list_count < MAX_COLS) {
+            strncpy(value_list_values[value_list_count], $3, MAX_VALUE_LEN - 1);
+            value_list_values[value_list_count][MAX_VALUE_LEN - 1] = '\0';
+            value_list_count++;
+        } else {
+            printf("Warning: too many values (max %d); ignoring '%s'\n", MAX_COLS, $3);
+        }
       }
 ;
 
+/* A value can be a NUMBER-token-as-string or IDENT-token-as-string */
 value:
       NUMBER { $$ = $1; }
-    | IDENT { $$ = $1; }
+    | IDENT  { $$ = $1; }
 ;
 
+/* ---------------- SELECT * FROM ... ---------------- */
 select_stmt:
     SELECT STAR FROM IDENT {
         int found = 0;
         for (int i = 0; i < table_count; i++) {
             if (strcmp(tables[i].name, $4) == 0) {
                 printf("Rows in table %s:\n", $4);
+
+                // Column headers
+                for (int c = 0; c < tables[i].col_count; c++) {
+                    printf("%s\t", tables[i].columns[c]);
+                }
+                printf("\n");
+
+                // Rows
                 for (int r = 0; r < tables[i].row_count; r++) {
                     for (int c = 0; c < tables[i].col_count; c++)
-                        
                         printf("%s\t", tables[i].rows[r][c]);
                     printf("\n");
                 }
